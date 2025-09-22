@@ -40,7 +40,7 @@ async def stop(update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
     await update.message.reply_text("❌ Ты отписался от уведомлений о Лабубу.")
 
 # Фоновая задача
-async def notifier(app):
+async def notifier(bot):
     while True:
         if chat_ids:
             msg = random.choice(MESSAGES)
@@ -49,18 +49,19 @@ async def notifier(app):
             )
             for chat_id in chat_ids.copy():
                 try:
-                    await app.bot.send_message(chat_id, msg, reply_markup=keyboard)
+                    await bot.send_message(chat_id, msg, reply_markup=keyboard)
                 except Exception as e:
                     logging.error(e)
         await asyncio.sleep(1800)  # 30 минут
 
-# Запуск
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
 
-    asyncio.create_task(notifier(app))
+    # Запускаем фоновую задачу
+    asyncio.create_task(notifier(app.bot))
+
     await app.start()
     await app.updater.start_polling()
     await app.updater.idle()
