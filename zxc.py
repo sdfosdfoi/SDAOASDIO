@@ -1,5 +1,5 @@
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 import time
 import random
 import threading
@@ -25,11 +25,11 @@ messages = [
 user_threads = {}  # Словарь для хранения потоков пользователей
 
 def create_play_button():
-    # Создаём инлайн-кнопку для открытия игры как Telegram Web App
+    # Создаём инлайн-кнопку с WebAppInfo для открытия игры как Telegram Web App
     markup = InlineKeyboardMarkup()
     play_button = InlineKeyboardButton(
-        text="Играть!", 
-        web_app={"url": "https://labubub-4mj5.vercel.app"}  # Открывает игру в Telegram WebView
+        text="Играть!",
+        web_app=WebAppInfo(url="https://labubub-4mj5.vercel.app")
     )
     markup.add(play_button)
     return markup
@@ -69,7 +69,15 @@ try:
 except Exception as e:
     print(f"Ошибка при удалении webhook: {e}")
 
+# Задержка перед запуском polling для предотвращения конфликтов
+time.sleep(5)
+
 # Запуск бота
 if __name__ == '__main__':
     print("Бот запущен...")
-    bot.polling(none_stop=True)
+    try:
+        bot.polling(none_stop=True, interval=0, timeout=20)
+    except Exception as e:
+        print(f"Ошибка polling: {e}")
+        time.sleep(10)  # Задержка перед повторной попыткой
+        bot.polling(none_stop=True, interval=0, timeout=20)
