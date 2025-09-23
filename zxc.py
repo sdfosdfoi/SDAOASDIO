@@ -3,10 +3,20 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 import time
 import random
 import threading
+import logging
+from flask import Flask, request
+import os
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Токен бота
 TOKEN = '8356139072:AAFhiu7mSCb431Ewa8-vnwIPVsLW9l46TyA'
 bot = telebot.TeleBot(TOKEN)
+
+# Создаём Flask-приложение для обработки webhook
+app = Flask(__name__)
 
 # Список случайных уведомлений (короткие фразы, до 2 слов)
 messages = [
@@ -25,7 +35,7 @@ messages = [
 user_threads = {}  # Словарь для хранения потоков пользователей
 
 def create_play_button():
-    # Создаём инлайн-кнопку с WebAppInfo для открытия игры как Telegram Web App
+    logger.info("Создание кнопки Web App")
     markup = InlineKeyboardMarkup()
     play_button = InlineKeyboardButton(
         text="Играть!",
@@ -44,7 +54,7 @@ def start_message(message):
         "Собирай уникальных питомцев, соревнуйся с друзьями и покажи всем, кто здесь босс! "
         "Я буду напоминать тебе каждые 30 минут, когда мне нужно внимание. 😊 Готов начать?"
     )
-    # Отправляем приветствие с кнопкой "Играть!"
+    logger.info(f"Отправка приветственного сообщения в чат {chat_id}")
     bot.reply_to(message, welcome_text, reply_markup=create_play_button())
     
     # Если поток уже существует, не создаем новый
@@ -55,29 +65,42 @@ def start_message(message):
                 notification = random.choice(messages)
                 try:
                     bot.send_message(chat_id, notification)
+                    logger.info(f"Уведомление отправлено в чат {chat_id}: {notification}")
                 except Exception as e:
-                    print(f"Ошибка отправки: {e}")
+                    logger.error(f"Ошибка отправки в чат {chat_id}: {e}")
         
         thread = threading.Thread(target=send_notifications, daemon=True)
         thread.start()
         user_threads[chat_id] = thread
+        logger.info(f"Запущен поток уведомлений для чата {chat_id}")
 
-# Автоматическое удаление webhook перед запуском polling
-try:
-    bot.delete_webhook()  # Удаляем webhook для корректной работы polling
-    print("Webhook удалён успешно.")
-except Exception as e:
-    print(f"Ошибка при удалении webhook: {e}")
+# Эндпоинт для обработки webhook
+@app.route('/' + TOKEN, methods=['POST'])
+def webhook():
+    update = telebot.types.Update.de_json(request.get_json())
+    if update:
+        bot.process_new_updates([update])
+    return '', 200
 
-# Задержка перед запуском polling для предотвращения конфликтов
-time.sleep(5)
+# Главная страница (для проверки)
+@app.route('/')
+def index():
+    return 'Bot is running!'
 
-# Запуск бота
-if __name__ == '__main__':
-    print("Бот запущен...")
+# Настройка webhook
+def setup_webhook():
     try:
-        bot.polling(none_stop=True, interval=0, timeout=20)
+        bot.remove_webhook()
+        time.sleep(1)  # Задержка для удаления старого webhook
+        webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TOKEN}"
+        bot.set_webhook(url=webhook_url)
+        logger.info(f"Webhook установлен: {webhook_url}")
     except Exception as e:
-        print(f"Ошибка polling: {e}")
-        time.sleep(10)  # Задержка перед повторной попыткой
-        bot.polling(none_stop=True, interval=0, timeout=20)
+        logger.error(f"Ошибка установки webhook: {e}")
+
+# Запуск Flask и бота
+if __name__ == '__main__':
+    logger.info("Бот запускается...")
+    setup_webhook()
+    port = int(os.getenv('PORT', 5000))  # Render задаёт PORT, по умолчанию 5000
+    app.run(host='0.0.0.0', port=port, debug=False)
