@@ -25,8 +25,12 @@ messages = [
 user_threads = {}  # Словарь для хранения потоков пользователей
 
 def create_play_button():
+    # Создаём инлайн-кнопку для открытия игры как Telegram Web App
     markup = InlineKeyboardMarkup()
-    play_button = InlineKeyboardButton(text="Играть!", url="https://labubub-4mj5.vercel.app")
+    play_button = InlineKeyboardButton(
+        text="Играть!", 
+        web_app={"url": "https://labubub-4mj5.vercel.app"}  # Открывает игру в Telegram WebView
+    )
     markup.add(play_button)
     return markup
 
@@ -40,6 +44,7 @@ def start_message(message):
         "Собирай уникальных питомцев, соревнуйся с друзьями и покажи всем, кто здесь босс! "
         "Я буду напоминать тебе каждые 30 минут, когда мне нужно внимание. 😊 Готов начать?"
     )
+    # Отправляем приветствие с кнопкой "Играть!"
     bot.reply_to(message, welcome_text, reply_markup=create_play_button())
     
     # Если поток уже существует, не создаем новый
@@ -56,6 +61,13 @@ def start_message(message):
         thread = threading.Thread(target=send_notifications, daemon=True)
         thread.start()
         user_threads[chat_id] = thread
+
+# Автоматическое удаление webhook перед запуском polling
+try:
+    bot.delete_webhook()  # Удаляем webhook для корректной работы polling
+    print("Webhook удалён успешно.")
+except Exception as e:
+    print(f"Ошибка при удалении webhook: {e}")
 
 # Запуск бота
 if __name__ == '__main__':
